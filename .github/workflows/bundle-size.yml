@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'Gruntfile.js'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/bundle-size.yml'
 
 jobs:
@@ -29,9 +30,7 @@ jobs:
           node-version: lts/*
 
       - name: Install dependencies (PR branch)
-        run: |
-          npm install -g grunt-cli
-          npm ci
+        run: npm ci
 
       - name: Build PR branch
         run: npm run build
@@ -55,7 +54,7 @@ jobs:
       - name: Check bundle size limits
         run: |
           set -o pipefail
-          npm run bundlesize 2>&1 | tee bundlesize-output.txt
+          npm run bundlesize 2>&1 | tee "$RUNNER_TEMP/bundlesize-output.txt"
 
       - name: Checkout base branch
         run: |
@@ -84,74 +83,98 @@ jobs:
 
       - name: Calculate size differences and post results
         uses: actions/github-script@v7
+        env:
+          PR_MIN_SIZE: ${{ steps.pr_size.outputs.pr_min_size }}
+          PR_FULL_SIZE: ${{ steps.pr_size.outputs.pr_full_size }}
+          PR_MIN_GZIP: ${{ steps.pr_size.outputs.pr_min_gzip }}
+          PR_FULL_GZIP: ${{ steps.pr_size.outputs.pr_full_gzip }}
+          BASE_MIN_SIZE: ${{ steps.base_size.outputs.base_min_size }}
+          BASE_FULL_SIZE: ${{ steps.base_size.outputs.base_full_size }}
+          BASE_MIN_GZIP: ${{ steps.base_size.outputs.base_min_gzip }}
+          BASE_FULL_GZIP: ${{ steps.base_size.outputs.base_full_gzip }}
+          BUNDLESIZE_OUTPUT_PATH: ${{ runner.temp }}/bundlesize-output.txt
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
+            const parseBytes = (value, label) => {
+              const parsed = Number.parseInt(value, 10);
+              if (!Number.isFinite(parsed)) {
+                throw new Error(`Expected numeric ${label}, received: ${value}`);
+              }
+              return parsed;
+            };
 
-            const prMinSize = parseInt('${{ steps.pr_size.outputs.pr_min_size }}');
-            const prFullSize = parseInt('${{ steps.pr_size.outputs.pr_full_size }}');
-            const prMinGzip = parseInt('${{ steps.pr_size.outputs.pr_min_gzip }}');
-            const prFullGzip = parseInt('${{ steps.pr_size.outputs.pr_full_gzip }}');
+            const prMinSize = parseBytes(process.env.PR_MIN_SIZE, 'PR_MIN_SIZE');
+            const prFullSize = parseBytes(process.env.PR_FULL_SIZE, 'PR_FULL_SIZE');
+            const prMinGzip = parseBytes(process.env.PR_MIN_GZIP, 'PR_MIN_GZIP');
+            const prFullGzip = parseBytes(process.env.PR_FULL_GZIP, 'PR_FULL_GZIP');
 
-            const baseMinSize = parseInt('${{ steps.base_size.outputs.base_min_size }}');
-            const baseFullSize = parseInt('${{ steps.base_size.outputs.base_full_size }}');
-            const baseMinGzip = parseInt('${{ steps.base_size.outputs.base_min_gzip }}');
-            const baseFullGzip = parseInt('${{ steps.base_size.outputs.base_full_gzip }}');
+            const baseMinSize = parseBytes(process.env.BASE_MIN_SIZE, 'BASE_MIN_SIZE');
+            const baseFullSize = parseBytes(process.env.BASE_FULL_SIZE, 'BASE_FULL_SIZE');
+            const baseMinGzip = parseBytes(process.env.BASE_MIN_GZIP, 'BASE_MIN_GZIP');
+            const baseFullGzip = parseBytes(process.env.BASE_FULL_GZIP, 'BASE_FULL_GZIP');
 
-            const bundlesizeOutput = fs.existsSync('bundlesize-output.txt')
-              ? fs.readFileSync('bundlesize-output.txt', 'utf8').trim()
+            const bundlesizeOutput = fs.existsSync(process.env.BUNDLESIZE_OUTPUT_PATH)
+              ? fs.readFileSync(process.env.BUNDLESIZE_OUTPUT_PATH, 'utf8').trim()
               : 'Bundle size command output was unavailable.';
 
             const formatBytes = (bytes) => {
-              if (bytes === 0) {
+              const absoluteBytes = Math.abs(bytes);
+              if (absoluteBytes === 0) {
                 return '0 B';
               }
 
-              const k = 1024;
-              const sizes = ['B', 'KB', 'MB'];
-              const i = Math.floor(Math.log(bytes) / Math.log(k));
-              return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+              const k = 1000;
+              const sizes = ['B', 'kB', 'MB'];
+              const i = Math.floor(Math.log(absoluteBytes) / Math.log(k));
+              const value = parseFloat((absoluteBytes / Math.pow(k, i)).toFixed(2));
+              return `${value} ${sizes[i]}`;
             };
 
             const formatDiff = (current, base) => {
               const diff = current - base;
-              const diffPercent = ((diff / base) * 100).toFixed(2);
-              const sign = diff > 0 ? '+' : '';
+              const sign = diff > 0 ? '+' : diff < 0 ? '-' : '';
+              const diffPercent = base === 0
+                ? 'n/a'
+                : `${sign}${Math.abs((diff / base) * 100).toFixed(2)}%`;
               const direction = diff > 0 ? 'increased' : diff < 0 ? 'decreased' : 'unchanged';
-              return `${direction}: ${sign}${formatBytes(diff)} (${sign}${diffPercent}%)`;
+              return `${direction}: ${sign}${formatBytes(diff)} (${diffPercent})`;
             };
 
             const minGzipDiff = prMinGzip - baseMinGzip;
             const minStatus = minGzipDiff > 0 ? 'increased' : minGzipDiff < 0 ? 'decreased' : 'unchanged';
 
-            const comment = `## Bundle Size Report
-
-            ### Minified Bundle
-            | Metric | Base | PR | Change |
-            |--------|------|-----|--------|
-            | **Size** | ${formatBytes(baseMinSize)} | ${formatBytes(prMinSize)} | ${formatDiff(prMinSize, baseMinSize)} |
-            | **Gzipped** | ${formatBytes(baseMinGzip)} | ${formatBytes(prMinGzip)} | ${formatDiff(prMinGzip, baseMinGzip)} |
-
-            ### Full Bundle (unminified)
-            | Metric | Base | PR | Change |
-            |--------|------|-----|--------|
-            | **Size** | ${formatBytes(baseFullSize)} | ${formatBytes(prFullSize)} | ${formatDiff(prFullSize, baseFullSize)} |
-            | **Gzipped** | ${formatBytes(baseFullGzip)} | ${formatBytes(prFullGzip)} | ${formatDiff(prFullGzip, baseFullGzip)} |
-
-            ### Bundle Size Check
-            \`\`\`text
-            ${bundlesizeOutput}
-            \`\`\`
-
-            ### Status
-            **Minified gzipped size**: ${formatBytes(prMinGzip)} (${minStatus} compared with base)
-
-            ${minGzipDiff > 0 ? '**Warning**: Bundle size increased.' : minGzipDiff < 0 ? '**Good**: Bundle size decreased.' : '**Good**: No change in bundle size.'}
-
-            ---
-            <sub>Measured on ${new Date().toLocaleString()}</sub>
-            `;
+            const marker = '<!-- bundle-size-report -->';
+            const comment = [
+              marker,
+              '## Bundle Size Report',
+              '',
+              '### Minified Bundle',
+              '| Metric | Base | PR | Change |',
+              '|--------|------|-----|--------|',
+              `| **Size** | ${formatBytes(baseMinSize)} | ${formatBytes(prMinSize)} | ${formatDiff(prMinSize, baseMinSize)} |`,
+              `| **Gzipped** | ${formatBytes(baseMinGzip)} | ${formatBytes(prMinGzip)} | ${formatDiff(prMinGzip, baseMinGzip)} |`,
+              '',
+              '### Full Bundle (unminified)',
+              '| Metric | Base | PR | Change |',
+              '|--------|------|-----|--------|',
+              `| **Size** | ${formatBytes(baseFullSize)} | ${formatBytes(prFullSize)} | ${formatDiff(prFullSize, baseFullSize)} |`,
+              `| **Gzipped** | ${formatBytes(baseFullGzip)} | ${formatBytes(prFullGzip)} | ${formatDiff(prFullGzip, baseFullGzip)} |`,
+              '',
+              '### Bundle Size Check',
+              '```text',
+              bundlesizeOutput,
+              '```',
+              '',
+              '### Status',
+              `**Minified gzipped size**: ${formatBytes(prMinGzip)} (${minStatus} compared with base)`,
+              '',
+              minGzipDiff > 0 ? '**Warning**: Bundle size increased.' : minGzipDiff < 0 ? '**Good**: Bundle size decreased.' : '**Good**: No change in bundle size.',
+              '',
+              '---',
+              `<sub>Measured on ${new Date().toISOString()}</sub>`
+            ].join('\n');
 
             try {
               // Find existing comment
@@ -162,7 +185,7 @@ jobs:
               });
 
               const botComment = comments.find(comment =>
-                comment.user.type === 'Bot' && comment.body.includes('Bundle Size Report')
+                comment.user.type === 'Bot' && comment.body.includes(marker)
               );
 
               if (botComment) {
@@ -185,8 +208,8 @@ jobs:
                 console.log('Created new comment');
               }
             } catch (error) {
-              // If we can't post a comment (e.g., insufficient permissions), log the report instead
-              console.log('Unable to post comment (likely insufficient permissions)');
+              // Fork PRs run under pull_request with a read-only token, so comment writes can fail by design.
+              console.log('Unable to post comment (likely insufficient permissions for a fork PR)');
               console.log('Bundle Size Report:');
               console.log(comment);
               // Don't fail the workflow

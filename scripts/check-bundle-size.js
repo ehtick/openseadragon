@@ -9,13 +9,17 @@ const packageJson = require(path.join(root, 'package.json'));
 const checks = packageJson.bundlesize || [];
 
 function parseMaxSize(size) {
-    const match = /^([\d.]+)\s*(b|kb|mb)$/i.exec(size);
+    const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb)$/i.exec(size);
 
     if (!match) {
         throw new Error(`Unsupported maxSize value: ${size}`);
     }
 
     const amount = Number(match[1]);
+    if (!Number.isFinite(amount)) {
+        throw new Error(`Unsupported maxSize value: ${size}`);
+    }
+
     const unit = match[2].toLowerCase();
     const multipliers = {
         b: 1,
@@ -31,7 +35,7 @@ function formatSize(bytes) {
         return `${bytes}B`;
     }
 
-    return `${(bytes / 1000).toFixed(2)}KB`;
+    return `${(bytes / 1000).toFixed(2)}kB`;
 }
 
 function getSize(filePath, compression) {
