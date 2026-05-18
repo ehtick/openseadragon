@@ -837,7 +837,7 @@ declare namespace OpenSeadragon {
         raiseEventAwaiting<K extends keyof EventMap>(
             eventName: K,
             eventArgs?: object,
-            bindTarget?: any = null,
+            bindTarget?: any,
         ): Promise<any>;
         removeAllHandlers<K extends keyof EventMap>(eventName: K): void;
         removeHandler<K extends keyof EventMap>(
