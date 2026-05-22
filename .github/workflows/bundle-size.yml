@@ -38,6 +38,7 @@ jobs:
       - name: Get PR branch bundle sizes
         id: pr_size
         run: |
+          set -o pipefail
           # Get file sizes
           PR_MIN_SIZE=$(stat -f%z "build/openseadragon/openseadragon.min.js" 2>/dev/null || stat -c%s "build/openseadragon/openseadragon.min.js")
           PR_FULL_SIZE=$(stat -f%z "build/openseadragon/openseadragon.js" 2>/dev/null || stat -c%s "build/openseadragon/openseadragon.js")
@@ -68,6 +69,7 @@ jobs:
       - name: Get base branch bundle sizes
         id: base_size
         run: |
+          set -o pipefail
           # Get file sizes
           BASE_MIN_SIZE=$(stat -f%z "build/openseadragon/openseadragon.min.js" 2>/dev/null || stat -c%s "build/openseadragon/openseadragon.min.js")
           BASE_FULL_SIZE=$(stat -f%z "build/openseadragon/openseadragon.js" 2>/dev/null || stat -c%s "build/openseadragon/openseadragon.js")
@@ -127,7 +129,10 @@ jobs:
 
               const k = 1000;
               const sizes = ['B', 'kB', 'MB'];
-              const i = Math.floor(Math.log(absoluteBytes) / Math.log(k));
+              const i = Math.min(
+                Math.floor(Math.log(absoluteBytes) / Math.log(k)),
+                sizes.length - 1
+              );
               const value = parseFloat((absoluteBytes / Math.pow(k, i)).toFixed(2));
               return `${value} ${sizes[i]}`;
             };
