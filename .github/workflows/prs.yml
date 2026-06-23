@@ -25,7 +25,7 @@ jobs:
         with:
           cache: npm
           cache-dependency-path: package.json
-          node-version: 24 # There's a bug with puppeteer and Node 26 right now (June 23rd, 2026)
+          node-version: 20 # There's a bug with puppeteer and Node 26 right now (June 23rd, 2026)
 
       - name: Setup environment and install dependencies
         run: |
@@ -34,7 +34,7 @@ jobs:
 
       - name: Install Puppeteer Chrome
         run: |
-          npx puppeteer install chrome
+          npx puppeteer browsers install chrome
 
       - name: Run tests
         run: |
