@@ -514,7 +514,7 @@
   * @property {String} [navigatorDisplayRegionColor='#900']
   *     Specifies the border color of the display region rectangle of the navigator minimap
   *
-  * @property {String|Array} [navigatorDrawer=null]
+  * @property {String|DrawerImplementation|Array|null} [navigatorDrawer=null]
   *     Specifies the drawer type to use for the navigator minimap, overriding the
   *     parent viewer's drawer. Accepts the same values as the {@link OpenSeadragon.Options#drawer}
   *     option (e.g. 'canvas', 'webgl', 'html'). When null (the default), the navigator
@@ -723,9 +723,11 @@
   *     When using the WebGL drawer (the default) with cross-origin tile sources, this option must
   *     be set to 'Anonymous' (or 'use-credentials') and the tile server must respond with
   *     appropriate CORS headers (e.g. Access-Control-Allow-Origin: *). Without this, WebGL cannot
-  *     upload tile images as textures due to browser security restrictions, and the drawer will
-  *     fall back to canvas rendering. This applies equally to the navigator minimap — see also
-  *     navigatorDrawer if you want to use canvas for the navigator explicitly.
+  *     upload tile images as textures due to browser security restrictions. The viewer can only
+  *     fall back to canvas rendering if 'canvas' is included in the configured drawer candidates
+  *     (see {@link OpenSeadragon.Options#drawer} and {@link OpenSeadragon.Options#navigatorDrawer}).
+  *     This applies equally to the navigator minimap — see also navigatorDrawer if you want to
+  *     use canvas for the navigator explicitly.
   *
   * @property {Boolean} [ajaxWithCredentials=false]
   *     Whether to set the withCredentials XHR flag for AJAX requests.
