@@ -621,11 +621,20 @@ $.Viewer = function( options ) {
             displayRegionColor: this.navigatorDisplayRegionColor,
             crossOriginPolicy: this.crossOriginPolicy,
             animationTime:     this.animationTime,
-            drawer:            this.drawer.getType(),
+            drawer:            this.navigatorDrawer || options.drawer,
             drawerOptions:     this.drawerOptions,
             loadTilesWithAjax: this.loadTilesWithAjax,
             ajaxHeaders:       this.ajaxHeaders,
             ajaxWithCredentials: this.ajaxWithCredentials,
+        });
+
+        this.navigator.addOnceHandler('drawer-error', (event) => {
+            $.console.warn(
+                'OpenSeadragon navigator drawer error: ' + event.error +
+                ' If tiles are cross-origin, set crossOriginPolicy: "Anonymous" or ' +
+                '"use-credentials" (requires CORS headers on the tile server), or set ' +
+                'navigatorDrawer: "canvas" to use canvas explicitly.'
+            );
         });
     }
 
