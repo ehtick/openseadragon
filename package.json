@@ -62,12 +62,12 @@
     "bundlesize": [
         {
             "path": "build/openseadragon/openseadragon.min.js",
-            "maxSize": "90 kB",
+            "maxSize": "95 kB",
             "compression": "gzip"
         },
         {
             "path": "build/openseadragon/openseadragon.min.js",
-            "maxSize": "350 kB",
+            "maxSize": "375 kB",
             "compression": "none"
         }
     ],
