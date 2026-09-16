@@ -3,6 +3,9 @@ OPENSEADRAGON CHANGELOG
 
 6.2.0: (in progress...)
 
+* We now expose the HTTP status code in open-failed events when possible (#2972 @a-sayed123)
+* Improved unit tests (#2976 @animesh68)
+
 6.1.1:
 
 * Added missing TypeScript declarations for cooperative gesture handling (#2949 @superbland)
